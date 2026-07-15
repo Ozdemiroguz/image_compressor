@@ -1,0 +1,19 @@
+# .pubignore REPLACES .gitignore in this directory for `pub publish`, so it must
+# repeat the build/tooling excludes — otherwise build artifacts leak into the
+# published archive (a 44 MB .dill got in when this only listed DESIGN.md).
+# Unanchored patterns also cover example/ subdirectories.
+
+.dart_tool/
+build/
+.flutter-plugins-dependencies
+coverage/
+pubspec.lock
+**/doc/api/
+
+# Internal design notes — kept in git, not shipped to pub.dev.
+DESIGN.md
+# Benchmark charts: they illustrate BENCHMARK.md on GitHub, but pub.dev doesn't
+# render that file, so shipping them would be dead weight. (doc/demo.png stays —
+# the README hero uses it.)
+doc/bench-size.png
+doc/bench-time.png

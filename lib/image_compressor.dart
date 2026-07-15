@@ -1,0 +1,234 @@
+import 'dart:async';
+
+import 'image_compressor_platform_interface.dart';
+import 'src/cancel_token.dart';
+import 'src/encode_request.dart';
+import 'src/models.dart';
+import 'src/source_loader.dart';
+
+export 'src/byte_size.dart' show ByteSize;
+export 'src/cancel_token.dart' show CancelToken;
+export 'src/models.dart'
+    show
+        ImageFormat,
+        ImageSource,
+        CompressedImage,
+        CompressError,
+        UnsupportedFormatError,
+        SourceNotFoundError,
+        DecodeError,
+        CancelledError;
+export 'src/save.dart' show CompressedImageSave;
+
+/// Compress images in Flutter with a single call.
+///
+/// The headline feature is [toSize]: give it a byte ceiling and it finds the
+/// quality that lands the image under that size — no hand-rolled quality loop.
+/// [toQuality] is the familiar fixed-quality mode. Both work the same across
+/// Android, iOS and web, take any [ImageSource], and never return `null`
+/// (hard failures throw a [CompressError]).
+class ImageCompressor {
+  ImageCompressor._();
+
+  /// Compress [input] until it fits under [maxBytes].
+  ///
+  /// The native backend decodes once and binary-searches quality (down to
+  /// [minQuality]), returning the highest-quality result that still fits. If
+  /// even [minQuality] is too big, it returns the smallest achievable result
+  /// with [CompressedImage.reachedTarget] == false (never throws for that — you
+  /// still get usable bytes).
+  ///
+  /// This targets a size in the requested [format]; it does not guarantee the
+  /// output is smaller than the input. A source that is already tiny in a more
+  /// efficient format (e.g. a small PNG re-encoded to JPEG) can grow while still
+  /// fitting under [maxBytes]. Compare [CompressedImage.compressedBytes] to
+  /// [CompressedImage.originalBytes] if you want to keep the smaller one.
+  static Future<CompressedImage> toSize(
+    ImageSource input, {
+    required int maxBytes,
+    ImageFormat format = ImageFormat.jpeg,
+    int? maxWidth,
+    int? maxHeight,
+    bool autoOrient = true,
+    int minQuality = 10,
+    CancelToken? cancelToken,
+  }) async {
+    if (maxBytes <= 0) {
+      throw ArgumentError.value(maxBytes, 'maxBytes', 'must be positive');
+    }
+    if (minQuality < 0 || minQuality > 100) {
+      throw ArgumentError.value(minQuality, 'minQuality', 'must be 0..100');
+    }
+
+    cancelToken?.throwIfCancelled();
+    final bytes = await resolveSource(input);
+    cancelToken?.throwIfCancelled();
+    final result = await ImageCompressorPlatform.instance.encodeToSize(
+      EncodeSizeRequest(
+        bytes: bytes,
+        maxBytes: maxBytes,
+        minQuality: minQuality,
+        format: format,
+        autoOrient: autoOrient,
+        maxWidth: maxWidth,
+        maxHeight: maxHeight,
+      ),
+    );
+    return _toCompressed(
+      result,
+      originalBytes: bytes.length,
+      format: format,
+      usedQuality: result.usedQuality,
+      reachedTarget: result.reachedTarget,
+    );
+  }
+
+  /// Compress [input] at a fixed [quality] (0–100).
+  static Future<CompressedImage> toQuality(
+    ImageSource input, {
+    required int quality,
+    ImageFormat format = ImageFormat.jpeg,
+    int? maxWidth,
+    int? maxHeight,
+    bool autoOrient = true,
+    CancelToken? cancelToken,
+  }) async {
+    if (quality < 0 || quality > 100) {
+      throw ArgumentError.value(quality, 'quality', 'must be 0..100');
+    }
+
+    cancelToken?.throwIfCancelled();
+    final bytes = await resolveSource(input);
+    cancelToken?.throwIfCancelled();
+    final result = await ImageCompressorPlatform.instance.encodeOnce(
+      EncodeRequest(
+        bytes: bytes,
+        quality: quality,
+        format: format,
+        autoOrient: autoOrient,
+        maxWidth: maxWidth,
+        maxHeight: maxHeight,
+      ),
+    );
+    return _toCompressed(
+      result,
+      originalBytes: bytes.length,
+      format: format,
+      usedQuality: quality,
+      reachedTarget: true,
+    );
+  }
+
+  /// [toSize] over many images, at most [concurrency] in flight at once (keeps
+  /// peak memory bounded — the fix for "iOS crashes compressing in a loop").
+  static Future<List<CompressedImage>> toSizeAll(
+    List<ImageSource> inputs, {
+    required int maxBytes,
+    ImageFormat format = ImageFormat.jpeg,
+    int? maxWidth,
+    int? maxHeight,
+    bool autoOrient = true,
+    int minQuality = 10,
+    int concurrency = 3,
+    void Function(int done, int total)? onProgress,
+    CancelToken? cancelToken,
+  }) {
+    return _pooled(
+      inputs,
+      concurrency,
+      (input) => toSize(
+        input,
+        maxBytes: maxBytes,
+        format: format,
+        maxWidth: maxWidth,
+        maxHeight: maxHeight,
+        autoOrient: autoOrient,
+        minQuality: minQuality,
+        cancelToken: cancelToken,
+      ),
+      onProgress: onProgress,
+      cancelToken: cancelToken,
+    );
+  }
+
+  /// [toQuality] over many images, at most [concurrency] in flight at once.
+  static Future<List<CompressedImage>> toQualityAll(
+    List<ImageSource> inputs, {
+    required int quality,
+    ImageFormat format = ImageFormat.jpeg,
+    int? maxWidth,
+    int? maxHeight,
+    bool autoOrient = true,
+    int concurrency = 3,
+    void Function(int done, int total)? onProgress,
+    CancelToken? cancelToken,
+  }) {
+    return _pooled(
+      inputs,
+      concurrency,
+      (input) => toQuality(
+        input,
+        quality: quality,
+        format: format,
+        maxWidth: maxWidth,
+        maxHeight: maxHeight,
+        autoOrient: autoOrient,
+        cancelToken: cancelToken,
+      ),
+      onProgress: onProgress,
+      cancelToken: cancelToken,
+    );
+  }
+
+  static CompressedImage _toCompressed(
+    EncodeResult result, {
+    required int originalBytes,
+    required ImageFormat format,
+    required int usedQuality,
+    required bool reachedTarget,
+  }) {
+    return CompressedImage(
+      bytes: result.bytes,
+      width: result.width,
+      height: result.height,
+      originalBytes: originalBytes,
+      format: format,
+      usedQuality: usedQuality,
+      reachedTarget: reachedTarget,
+    );
+  }
+
+  /// Runs [task] over [items] with a bounded number of concurrent futures,
+  /// preserving input order in the result. Reports completions via [onProgress]
+  /// as `(done, total)` after each item finishes.
+  static Future<List<R>> _pooled<T, R>(
+    List<T> items,
+    int concurrency,
+    Future<R> Function(T) task, {
+    void Function(int done, int total)? onProgress,
+    CancelToken? cancelToken,
+  }) async {
+    if (concurrency < 1) {
+      throw ArgumentError.value(concurrency, 'concurrency', 'must be >= 1');
+    }
+    final results = List<R?>.filled(items.length, null);
+    var next = 0;
+    var done = 0;
+
+    Future<void> worker() async {
+      while (true) {
+        // Stop pulling new work once cancelled; in-flight items finish.
+        cancelToken?.throwIfCancelled();
+        final i = next++;
+        if (i >= items.length) return;
+        results[i] = await task(items[i]);
+        onProgress?.call(++done, items.length);
+      }
+    }
+
+    final count = concurrency < items.length ? concurrency : items.length;
+    final workers = List.generate(count, (_) => worker());
+    await Future.wait(workers);
+    return results.cast<R>();
+  }
+}
