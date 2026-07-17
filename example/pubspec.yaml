@@ -25,22 +25,18 @@ dependencies:
     # the parent directory to use the current plugin's version.
     path: ../
 
-  # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-
-  # Pure-Dart image gen/decode — the demo builds a real sample image to
-  # compress, and the integration test verifies the output is decodable.
-  image: ^4.5.4
-  # Save the compressed result to the device photo gallery.
-  gal: ^2.3.0
+  # Pick a real photo to compress.
+  image_picker: ^1.1.2
 
 dev_dependencies:
   integration_test:
     sdk: flutter
   flutter_test:
     sdk: flutter
-  # The incumbent, for head-to-head benchmark comparison only (not shipped).
+  # Test-only: build/decode real images in the integration suite.
+  image: ^4.5.4
+  # Test-only: head-to-head benchmark against the incumbent.
   flutter_image_compress: ^2.4.0
 
   # The "flutter_lints" package below contains a set of recommended lints to

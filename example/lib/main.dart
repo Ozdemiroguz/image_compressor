@@ -1,13 +1,9 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
-import 'package:gal/gal.dart';
-import 'package:image/image.dart' as img;
 import 'package:image_compressor/image_compressor.dart';
+// Both packages export an `ImageSource`; prefix image_picker's to avoid the clash.
+import 'package:image_picker/image_picker.dart' as picker;
 
-void main() {
-  runApp(const MyApp());
-}
+void main() => runApp(const MyApp());
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -31,73 +27,29 @@ class DemoPage extends StatefulWidget {
 }
 
 class _DemoPageState extends State<DemoPage> {
-  Uint8List? _original;
   CompressedImage? _result;
   String? _error;
-  bool _busy = false;
 
-  /// A realistic "already a photo" source: a detailed gradient encoded as a
-  /// high-quality JPEG, so the original is a few hundred KB — like a camera
-  /// shot — and compressing it down actually shrinks it.
-  Uint8List _sampleImage() {
-    const w = 1600, h = 1200;
-    final image = img.Image(width: w, height: h);
-    for (var y = 0; y < h; y++) {
-      for (var x = 0; x < w; x++) {
-        // Gradient + fine detail so JPEG has real content to work on.
-        final detail = ((x ~/ 4 + y ~/ 4) % 2) * 24;
-        image.setPixelRgb(
-          x,
-          y,
-          (x * 255 ~/ w + detail).clamp(0, 255),
-          (y * 255 ~/ h + detail).clamp(0, 255),
-          128,
-        );
-      }
-    }
-    return Uint8List.fromList(img.encodeJpg(image, quality: 100));
-  }
+  Future<void> _pickAndCompress() async {
+    final picked = await picker.ImagePicker().pickImage(
+      source: picker.ImageSource.gallery,
+    );
+    if (picked == null) return;
 
-  Future<void> _run() async {
-    setState(() {
-      _busy = true;
-      _error = null;
-      _result = null;
-    });
     try {
-      final source = _sampleImage();
+      // Compress the picked photo to under 500 KB — one call, no quality loop.
+      // The picked XFile goes straight in via ImageSource.xfile.
       final result = await ImageCompressor.toSize(
-        ImageSource.bytes(source),
-        maxBytes: 200.kb,
+        ImageSource.xfile(picked),
+        maxBytes: 500.kb,
       );
       setState(() {
-        _original = source;
         _result = result;
+        _error = null;
       });
     } on CompressError catch (e) {
       setState(() => _error = e.message);
-    } finally {
-      setState(() => _busy = false);
     }
-  }
-
-  Future<void> _saveToGallery() async {
-    final result = _result;
-    if (result == null) return;
-    try {
-      // gal saves the compressed bytes straight to the device photo gallery.
-      await Gal.putImageBytes(result.bytes, name: 'image_compressor_demo');
-      _snack('Saved ${_kb(result.compressedBytes)} to the gallery.');
-    } on GalException catch (e) {
-      _snack('Save failed: ${e.type.message}');
-    }
-  }
-
-  void _snack(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _kb(int bytes) => '${(bytes / 1024).toStringAsFixed(1)} KB';
@@ -108,78 +60,35 @@ class _DemoPageState extends State<DemoPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('image_compressor')),
       body: Center(
-        child: SingleChildScrollView(
+        child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Compress a 1600×1200 sample to under 200 KB',
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
               FilledButton.icon(
-                onPressed: _busy ? null : _run,
-                icon: _busy
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.compress),
-                label: const Text('Compress to 200 KB'),
+                onPressed: _pickAndCompress,
+                icon: const Icon(Icons.photo_library),
+                label: const Text('Pick a photo & compress to 500 KB'),
               ),
               const SizedBox(height: 24),
               if (_error != null)
                 Text('Error: $_error',
                     style: const TextStyle(color: Colors.red)),
-              if (result != null && _original != null) ...[
-                _StatRow('Original', _kb(result.originalBytes)),
-                _StatRow('Compressed', _kb(result.compressedBytes)),
-                _StatRow('Reduction',
-                    '${((1 - result.ratio) * 100).toStringAsFixed(1)}%'),
-                _StatRow('Quality used', '${result.usedQuality}'),
-                _StatRow('Reached target', '${result.reachedTarget}'),
-                _StatRow('Dimensions',
-                    '${result.width}×${result.height} · ${result.format.name}'),
+              if (result != null) ...[
+                Text(
+                  '${_kb(result.originalBytes)}  →  ${_kb(result.compressedBytes)}'
+                  '   (quality ${result.usedQuality})',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
                 const SizedBox(height: 16),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.memory(result.bytes, width: 220),
-                ),
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  onPressed: _saveToGallery,
-                  icon: const Icon(Icons.save_alt),
-                  label: const Text('Save to gallery'),
+                  child: Image.memory(result.bytes, width: 260),
                 ),
               ],
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _StatRow extends StatelessWidget {
-  const _StatRow(this.label, this.value);
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 140,
-            child: Text(label, style: const TextStyle(color: Colors.grey)),
-          ),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
-        ],
       ),
     );
   }
