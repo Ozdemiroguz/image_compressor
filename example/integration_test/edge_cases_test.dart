@@ -29,6 +29,28 @@ img.Image _detailed(int w, int h) {
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
+  testWidgets('batch isolates a bad image (0.2.0 BatchResult, on real native)',
+      (tester) async {
+    // Three real photos with one genuinely-undecodable blob in the middle.
+    final inputs = [
+      ImageSource.bytes(_jpg(_detailed(800, 600))),
+      ImageSource.bytes(Uint8List.fromList(List.generate(4096, (i) => i % 256))),
+      ImageSource.bytes(_jpg(_detailed(640, 480))),
+    ];
+
+    final results = await ImageCompressor.toSizeAll(inputs, maxBytes: 200.kb);
+
+    // Every input has a result, in order; the bad one is isolated.
+    expect(results.length, 3);
+    expect(results[0], isA<BatchSuccess>());
+    expect(results[1], isA<BatchFailure>());
+    expect(results[2], isA<BatchSuccess>());
+    expect((results[1] as BatchFailure).error, isA<DecodeError>());
+    // ignore: avoid_print
+    print('BATCH ${results.whereType<BatchSuccess>().length} ok, '
+        '${results.whereType<BatchFailure>().length} failed — batch survived');
+  });
+
   testWidgets('large ~27MP image compresses without OOM (the differentiator)',
       (tester) async {
     // 6000x4500 = 27 MP. A naive "decode full bitmap" approach spikes ~108 MB
