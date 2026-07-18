@@ -2,9 +2,11 @@
 
 * Simpler example: pick a photo and compress it to 500 KB — the 30-second story,
   instead of the old benchmark harness.
-* Added a public [ROADMAP](ROADMAP.md) with the release cadence.
-* Docs: `flutter pub add` in place of a pinned version; README links the roadmap.
+* Docs: inline `dart` examples on `toSize`, `toQuality`, and `toSizeAll` in the
+  API reference; documented the remaining `CompressedImage` fields.
+* Docs: `flutter pub add` in place of a pinned version in the README.
 * Kept IDE files (`*.iml`, `.idea/`) out of the published archive.
+* Added a ROADMAP.md (release cadence).
 
 ## 0.1.2
 

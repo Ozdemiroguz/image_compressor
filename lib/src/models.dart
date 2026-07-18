@@ -75,7 +75,10 @@ class CompressedImage {
   /// The compressed image data.
   final Uint8List bytes;
 
+  /// Width of the output in pixels (after any resize / orientation).
   final int width;
+
+  /// Height of the output in pixels (after any resize / orientation).
   final int height;
 
   /// Byte length of the input, before compression.
@@ -84,13 +87,14 @@ class CompressedImage {
   /// Byte length after compression — i.e. `bytes.length`.
   int get compressedBytes => bytes.length;
 
+  /// The encoded format of [bytes].
   final ImageFormat format;
 
   /// The quality (0–100) the encoder stopped at. For a `toSize` call this is
   /// where the binary search landed.
   final int usedQuality;
 
-  /// `toSize` only: whether the [maxBytes] ceiling was actually met. When
+  /// `toSize` only: whether the `maxBytes` ceiling was actually met. When
   /// `false`, [bytes] is the smallest result achievable at `minQuality` — still
   /// usable, never null, but above the requested size.
   final bool reachedTarget;

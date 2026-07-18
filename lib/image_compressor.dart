@@ -43,6 +43,15 @@ class ImageCompressor {
   /// efficient format (e.g. a small PNG re-encoded to JPEG) can grow while still
   /// fitting under [maxBytes]. Compare [CompressedImage.compressedBytes] to
   /// [CompressedImage.originalBytes] if you want to keep the smaller one.
+  ///
+  /// ```dart
+  /// final image = await ImageCompressor.toSize(
+  ///   ImageSource.xfile(pickedPhoto), // e.g. from image_picker
+  ///   maxBytes: 500.kb,               // "get it under 500 KB"
+  /// );
+  /// print('${image.originalBytes} -> ${image.compressedBytes} bytes');
+  /// await image.saveTo('/path/out.jpg');
+  /// ```
   static Future<CompressedImage> toSize(
     ImageSource input, {
     required int maxBytes,
@@ -84,6 +93,14 @@ class ImageCompressor {
   }
 
   /// Compress [input] at a fixed [quality] (0–100).
+  ///
+  /// ```dart
+  /// final image = await ImageCompressor.toQuality(
+  ///   ImageSource.file('/path/photo.jpg'),
+  ///   quality: 80,
+  ///   maxWidth: 1920, // optional: also cap dimensions, aspect preserved
+  /// );
+  /// ```
   static Future<CompressedImage> toQuality(
     ImageSource input, {
     required int quality,
@@ -121,6 +138,17 @@ class ImageCompressor {
 
   /// [toSize] over many images, at most [concurrency] in flight at once (keeps
   /// peak memory bounded — the fix for "iOS crashes compressing in a loop").
+  ///
+  /// ```dart
+  /// final token = CancelToken();
+  /// final results = await ImageCompressor.toSizeAll(
+  ///   photos.map(ImageSource.xfile).toList(),
+  ///   maxBytes: 300.kb,
+  ///   concurrency: 3,
+  ///   onProgress: (done, total) => print('$done / $total'),
+  ///   cancelToken: token,
+  /// );
+  /// ```
   static Future<List<CompressedImage>> toSizeAll(
     List<ImageSource> inputs, {
     required int maxBytes,

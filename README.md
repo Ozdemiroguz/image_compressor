@@ -194,12 +194,6 @@ on DecodeError            { /* not a decodable image */ }
 on CancelledError         { /* cancelled via CancelToken */ }
 ```
 
-## 🗺️ Roadmap
-
-Small, regular releases — see [ROADMAP.md](ROADMAP.md) for the cadence and
-what's planned. Requests and bug reports on the
-[issue tracker](https://github.com/Ozdemiroguz/image_compressor/issues) shape it.
-
 ## 💛 Support
 
 This package is free and MIT-licensed, maintained solo in my spare time. If it
