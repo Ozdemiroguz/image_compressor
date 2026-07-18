@@ -12,9 +12,10 @@ pubspec.lock
 *.iml
 .idea/
 
-# Test/benchmark harness — kept in the repo for CI and local runs, but it's not
-# what the pub.dev "Example" should show. The published example is just the clean
-# pick-and-compress demo (example/lib/main.dart).
+# Dev/test harness — kept in the repo for CI and local runs, but a consumer of
+# the package never runs it. The published archive is what people import and
+# read: lib/, the example DEMO (example/lib/main.dart), and the docs.
+test/
 example/integration_test/
 example/test_driver/
 example/test/
