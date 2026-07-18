@@ -34,29 +34,46 @@ result is small enough. But what you actually need is almost always *"make this
 fit under X KB"* — for an upload limit, an avatar, an attachment. So everyone
 writes the same quality-guessing loop by hand.
 
-`image_compressor` makes that the headline feature (`toSize`), and does the
-search in native code so it stays fast on large photos. It also fixes the papercuts
-that plague the popular options:
+`image_compressor` makes that the headline feature (`toSize`), and runs the
+search in native code so it stays fast on large photos.
 
-- **Target file size** — the thing no other package does.
-- **Zero-config web** — real in-browser encoding via `OffscreenCanvas`, no
-  `pica` script tag, no extra setup.
+A few packages can hit a target size now. What none of them do is hit it **on
+the web too, without shipping a single native binary** — `image_compressor` is
+the one that does all three:
+
+- 🎯 **Target file size** — ask for "under X KB", not a quality number to guess.
+- 🌐 **Real web support** — in-browser encoding via `OffscreenCanvas`, no `pica`
+  script tag, no setup. (FFI-based compressors can't run on web at all.)
+- 🪶 **Zero bundled binaries** — it uses each platform's own codecs, so your app
+  doesn't grow by a megabyte of Rust/C per architecture.
+
+Plus the papercuts fixed along the way:
+
 - **No OOM on big images** — downsamples during decode instead of loading a
   full bitmap and then shrinking it.
 - **Orientation just works** — EXIF rotation is baked into the pixels by default.
+- **Batch that survives a bad image** — every input gets its own result; one
+  corrupt file can't discard the other 49.
 - **Never returns `null`** — hard failures throw a typed `CompressError`.
 
-### How it compares
+### The combination
 
-| | **image_compressor** | Most other packages |
-|---|:---:|:---:|
-| Compress to a **target file size** | ✅ | ❌ |
-| Zero-config web | ✅ | ❌ / needs setup |
-| Automatic EXIF orientation | ✅ | varies |
-| Large images without OOM (decode-time downsample) | ✅ | ❌ |
-| Batch + progress + cancel | ✅ | rare |
-| Typed errors, never `null` | ✅ | varies |
-| One API, not several overlapping methods | ✅ | varies |
+Any given row below, some package has. The point is that **one** package has all
+of them at once:
+
+| | image_compressor |
+|---|:---:|
+| Compress to a **target file size** | ✅ |
+| Works on **web** (not just mobile) | ✅ |
+| **No** bundled native binary (uses platform codecs) | ✅ |
+| Large images without OOM (decode-time downsample) | ✅ |
+| Automatic EXIF orientation | ✅ |
+| Batch that isolates failures + progress + cancel | ✅ |
+| Typed errors, never `null` | ✅ |
+| One API, not several overlapping methods | ✅ |
+
+The popular quality-only compressor is missing the first row. The fast FFI ones
+are missing the second and third. This package is the intersection.
 
 Speed is a dead heat with the popular packages (103 ms vs 102 ms on a 6.75 MP
 photo — and ours includes the orientation pass theirs skips). What it adds is
@@ -199,6 +216,33 @@ on SourceNotFoundError    { /* missing file / bad asset / file on web */ }
 on DecodeError            { /* not a decodable image */ }
 on CancelledError         { /* cancelled via CancelToken */ }
 ```
+
+## ❓ FAQ
+
+**Does it hit the target size exactly?**
+It gets as close under the ceiling as the format allows. The native side
+binary-searches quality and returns the highest one that still fits, so you use
+the budget instead of undershooting it. If even the lowest quality is too big,
+you get the smallest achievable result with `reachedTarget: false` — never an
+exception, never `null`.
+
+**Will it bloat my app?**
+No. It uses each platform's own image codecs (BitmapFactory, ImageIO,
+`OffscreenCanvas`) — there's no Rust/C library bundled per architecture, so your
+app size doesn't change meaningfully.
+
+**Does the web support actually work?**
+Yes — real in-browser encoding via `OffscreenCanvas.convertToBlob`, no `pica`
+script tag or `index.html` setup. Needs Safari 16.4+ / any evergreen engine.
+(Compressors built on `dart:ffi` can't run on web at all.)
+
+**One image in my batch is corrupt — do I lose the rest?**
+No. `toSizeAll` / `toQualityAll` return one `BatchResult` per input; the bad one
+comes back as a `BatchFailure` and the rest still succeed.
+
+**Is it slower than the native alternatives?**
+No — it's a dead heat (103 ms vs 102 ms on a 6.75 MP photo), and that includes
+the EXIF orientation pass most alternatives skip. See [BENCHMARK.md](BENCHMARK.md).
 
 ## 💛 Support
 
