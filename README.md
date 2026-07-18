@@ -67,9 +67,8 @@ and method in [BENCHMARK.md](BENCHMARK.md).
 
 ## 📦 Install
 
-```yaml
-dependencies:
-  image_compressor: ^0.1.0
+```bash
+flutter pub add image_compressor
 ```
 
 ```dart
@@ -194,6 +193,12 @@ on SourceNotFoundError    { /* missing file / bad asset / file on web */ }
 on DecodeError            { /* not a decodable image */ }
 on CancelledError         { /* cancelled via CancelToken */ }
 ```
+
+## 🗺️ Roadmap
+
+Small, regular releases — see [ROADMAP.md](ROADMAP.md) for the cadence and
+what's planned. Requests and bug reports on the
+[issue tracker](https://github.com/Ozdemiroguz/image_compressor/issues) shape it.
 
 ## 💛 Support
 

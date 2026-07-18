@@ -9,6 +9,8 @@ build/
 coverage/
 pubspec.lock
 **/doc/api/
+*.iml
+.idea/
 
 # Internal design notes — kept in git, not shipped to pub.dev.
 DESIGN.md

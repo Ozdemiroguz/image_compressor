@@ -1,3 +1,11 @@
+## 0.1.3
+
+* Simpler example: pick a photo and compress it to 500 KB — the 30-second story,
+  instead of the old benchmark harness.
+* Added a public [ROADMAP](ROADMAP.md) with the release cadence.
+* Docs: `flutter pub add` in place of a pinned version; README links the roadmap.
+* Kept IDE files (`*.iml`, `.idea/`) out of the published archive.
+
 ## 0.1.2
 
 * **Retracted an unfair performance claim.** 0.1.1's README said we return a
