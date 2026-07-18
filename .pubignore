@@ -12,6 +12,13 @@ pubspec.lock
 *.iml
 .idea/
 
+# Test/benchmark harness — kept in the repo for CI and local runs, but it's not
+# what the pub.dev "Example" should show. The published example is just the clean
+# pick-and-compress demo (example/lib/main.dart).
+example/integration_test/
+example/test_driver/
+example/test/
+
 # Internal design notes — kept in git, not shipped to pub.dev.
 DESIGN.md
 # Benchmark charts: they illustrate BENCHMARK.md on GitHub, but pub.dev doesn't
