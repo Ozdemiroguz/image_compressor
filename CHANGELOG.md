@@ -1,3 +1,14 @@
+## 0.2.1
+
+Docs only.
+
+* Honest, sharper positioning. Target-size isn't unique anymore, so the README no
+  longer claims "the thing no other package does". The real, defensible moat is
+  the *combination*: the one package that does target-size **and** runs on web
+  **and** ships zero native binaries.
+* Added an FAQ and a chart showing why a target size beats guessing a quality
+  number.
+
 ## 0.2.0
 
 **Breaking:** `toSizeAll` / `toQualityAll` now return `List<BatchResult>`

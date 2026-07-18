@@ -111,6 +111,11 @@ If even the lowest quality can't reach `maxBytes`, you still get the smallest
 achievable result back with `reachedTarget == false` — never an exception, never
 `null`.
 
+Why this beats a quality number: a fixed quality overshoots or blows the budget,
+and you'd have to guess which. `toSize` finds the one that fits.
+
+![Same photo, same cap: quality 90/80/70 all blow a 400 KB budget, quality 50 fits but wastes 92 KB; toSize finds quality 55 and lands right at 394 KB](doc/bench-size.png)
+
 > `maxBytes` is a plain byte count. Importing the package adds `.kb` / `.mb`
 > helpers so you can write `500.kb` or `2.mb` instead of `500 * 1024`.
 

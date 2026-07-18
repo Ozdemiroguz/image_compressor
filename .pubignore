@@ -22,9 +22,8 @@ example/test/
 
 # Internal design notes — kept in git, not shipped to pub.dev.
 DESIGN.md
-# Benchmark charts: they illustrate BENCHMARK.md on GitHub, but pub.dev doesn't
-# render that file, so shipping them would be dead weight. (doc/demo.png stays —
-# the README hero uses it.)
+# doc/demo.png and doc/bench-size.png stay — the README uses both. The rest are
+# not referenced by the README (bench-time only illustrates BENCHMARK.md, which
+# pub.dev doesn't render; cover is for the Medium post), so they'd be dead weight.
 doc/cover.png
-doc/bench-size.png
 doc/bench-time.png
