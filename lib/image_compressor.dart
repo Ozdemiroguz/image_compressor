@@ -13,6 +13,9 @@ export 'src/models.dart'
         ImageFormat,
         ImageSource,
         CompressedImage,
+        BatchResult,
+        BatchSuccess,
+        BatchFailure,
         CompressError,
         UnsupportedFormatError,
         SourceNotFoundError,
@@ -140,16 +143,18 @@ class ImageCompressor {
   /// peak memory bounded — the fix for "iOS crashes compressing in a loop").
   ///
   /// ```dart
-  /// final token = CancelToken();
   /// final results = await ImageCompressor.toSizeAll(
   ///   photos.map(ImageSource.xfile).toList(),
   ///   maxBytes: 300.kb,
   ///   concurrency: 3,
   ///   onProgress: (done, total) => print('$done / $total'),
-  ///   cancelToken: token,
   /// );
+  /// final images = results.whereType<BatchSuccess>().map((r) => r.image);
   /// ```
-  static Future<List<CompressedImage>> toSizeAll(
+  /// Returns one [BatchResult] per input, in order — a [BatchSuccess] or a
+  /// [BatchFailure]. A single unreadable image can't sink the batch; only a
+  /// [CancelToken] cancellation throws (aborting the whole operation).
+  static Future<List<BatchResult>> toSizeAll(
     List<ImageSource> inputs, {
     required int maxBytes,
     ImageFormat format = ImageFormat.jpeg,
@@ -164,15 +169,18 @@ class ImageCompressor {
     return _pooled(
       inputs,
       concurrency,
-      (input) => toSize(
+      (input) => _guard(
         input,
-        maxBytes: maxBytes,
-        format: format,
-        maxWidth: maxWidth,
-        maxHeight: maxHeight,
-        autoOrient: autoOrient,
-        minQuality: minQuality,
-        cancelToken: cancelToken,
+        () => toSize(
+          input,
+          maxBytes: maxBytes,
+          format: format,
+          maxWidth: maxWidth,
+          maxHeight: maxHeight,
+          autoOrient: autoOrient,
+          minQuality: minQuality,
+          cancelToken: cancelToken,
+        ),
       ),
       onProgress: onProgress,
       cancelToken: cancelToken,
@@ -180,7 +188,9 @@ class ImageCompressor {
   }
 
   /// [toQuality] over many images, at most [concurrency] in flight at once.
-  static Future<List<CompressedImage>> toQualityAll(
+  ///
+  /// Returns one [BatchResult] per input, in order (see [toSizeAll]).
+  static Future<List<BatchResult>> toQualityAll(
     List<ImageSource> inputs, {
     required int quality,
     ImageFormat format = ImageFormat.jpeg,
@@ -194,18 +204,37 @@ class ImageCompressor {
     return _pooled(
       inputs,
       concurrency,
-      (input) => toQuality(
+      (input) => _guard(
         input,
-        quality: quality,
-        format: format,
-        maxWidth: maxWidth,
-        maxHeight: maxHeight,
-        autoOrient: autoOrient,
-        cancelToken: cancelToken,
+        () => toQuality(
+          input,
+          quality: quality,
+          format: format,
+          maxWidth: maxWidth,
+          maxHeight: maxHeight,
+          autoOrient: autoOrient,
+          cancelToken: cancelToken,
+        ),
       ),
       onProgress: onProgress,
       cancelToken: cancelToken,
     );
+  }
+
+  /// Runs one compress and turns its outcome into a [BatchResult]. A
+  /// [CancelledError] is rethrown so it aborts the whole batch; every other
+  /// [CompressError] becomes a [BatchFailure] so one bad image is isolated.
+  static Future<BatchResult> _guard(
+    ImageSource input,
+    Future<CompressedImage> Function() run,
+  ) async {
+    try {
+      return BatchSuccess(input, await run());
+    } on CancelledError {
+      rethrow;
+    } on CompressError catch (e) {
+      return BatchFailure(input, e);
+    }
   }
 
   static CompressedImage _toCompressed(

@@ -1,6 +1,6 @@
 name: image_compressor
 description: "Compress images to a target file size in Flutter — one call to get an image under X KB. Native speed, zero-config web, automatic orientation and large-image handling."
-version: 0.1.3
+version: 0.2.0
 homepage: https://github.com/Ozdemiroguz/image_compressor
 repository: https://github.com/Ozdemiroguz/image_compressor
 issue_tracker: https://github.com/Ozdemiroguz/image_compressor/issues

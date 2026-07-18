@@ -108,6 +108,42 @@ class CompressedImage {
       'bytes, q=$usedQuality, format=$format, reachedTarget=$reachedTarget)';
 }
 
+/// The outcome of one image in a batch (`toSizeAll` / `toQualityAll`).
+///
+/// A batch never fails as a whole because one image is bad — each input gets its
+/// own result, so a single corrupt file can't discard the others. Match on the
+/// subtypes, or pull just the successes:
+///
+/// ```dart
+/// final results = await ImageCompressor.toSizeAll(inputs, maxBytes: 500.kb);
+/// final images = results.whereType<BatchSuccess>().map((r) => r.image).toList();
+/// for (final r in results.whereType<BatchFailure>()) {
+///   debugPrint('failed: ${r.source} — ${r.error.message}');
+/// }
+/// ```
+sealed class BatchResult {
+  const BatchResult(this.source);
+
+  /// The input this result corresponds to.
+  final ImageSource source;
+}
+
+/// A batch item that compressed successfully.
+class BatchSuccess extends BatchResult {
+  const BatchSuccess(super.source, this.image);
+
+  /// The compressed result for [BatchResult.source].
+  final CompressedImage image;
+}
+
+/// A batch item that failed — the others in the batch are unaffected.
+class BatchFailure extends BatchResult {
+  const BatchFailure(super.source, this.error);
+
+  /// Why [BatchResult.source] could not be compressed.
+  final CompressError error;
+}
+
 /// Base type for every failure this package throws. Callers can catch
 /// [CompressError] broadly or match on the specific subtypes below.
 sealed class CompressError implements Exception {

@@ -18,6 +18,10 @@ class FakePlatform
   int concurrentNow = 0;
   int maxConcurrent = 0;
 
+  /// If set, encodeOnce throws DecodeError for the request whose input bytes
+  /// have exactly this length — used to simulate one bad image in a batch.
+  int? failOnBytesLength;
+
   // Canned native result for encodeToSize.
   EncodeResult sizeResult = EncodeResult(
     bytes: Uint8List(4000),
@@ -36,6 +40,9 @@ class FakePlatform
     onceRequests.add(request);
     await Future<void>.delayed(Duration.zero);
     concurrentNow--;
+    if (failOnBytesLength != null && request.bytes.length == failOnBytesLength) {
+      throw DecodeError('simulated bad image');
+    }
     return EncodeResult(
       bytes: Uint8List(2000),
       width: 640,
@@ -131,9 +138,29 @@ void main() {
       );
 
       expect(results.length, 10);
-      expect(results.every((r) => r.usedQuality == 80), isTrue);
+      expect(results.every((r) => r is BatchSuccess), isTrue);
+      expect(
+        results.every((r) => (r as BatchSuccess).image.usedQuality == 80),
+        isTrue,
+      );
       expect(fake.maxConcurrent, lessThanOrEqualTo(3));
       expect(fake.maxConcurrent, greaterThan(1));
+    });
+
+    test('one bad item becomes a BatchFailure; the rest still succeed',
+        () async {
+      // Make the 3rd input fail natively; the other four must survive.
+      fake.failOnBytesLength = 3;
+      final inputs = List.generate(5, (i) => ImageSource.bytes(_input(i + 1)));
+
+      final results = await ImageCompressor.toQualityAll(inputs, quality: 80);
+
+      expect(results.length, 5, reason: 'every input has a result');
+      expect(results.whereType<BatchSuccess>().length, 4);
+      final failure = results.whereType<BatchFailure>().single;
+      expect(failure.error, isA<DecodeError>());
+      // Index/order preserved: the failure is the 3rd input.
+      expect(results.indexOf(failure), 2);
     });
 
     test('reports progress as (done, total) for every item', () async {

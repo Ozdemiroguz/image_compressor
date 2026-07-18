@@ -1,5 +1,15 @@
-## 0.1.3
+## 0.2.0
 
+**Breaking:** `toSizeAll` / `toQualityAll` now return `List<BatchResult>`
+(previously `List<CompressedImage>`).
+
+* **Batch is no longer all-or-nothing.** One unreadable image used to throw and
+  discard every other result. Each input now gets its own `BatchResult` —
+  `BatchSuccess(source, image)` or `BatchFailure(source, error)` — in input
+  order, so a single bad file can't sink the batch. Only a `CancelToken`
+  cancellation still throws (it aborts the whole operation on purpose).
+  * Migration: `results` → `results.whereType<BatchSuccess>().map((r) => r.image)`
+    for just the compressed images; check `whereType<BatchFailure>()` for the rest.
 * Simpler example: pick a photo and compress it to 500 KB — the 30-second story,
   instead of the old benchmark harness.
 * Docs: inline `dart` examples on `toSize`, `toQuality`, and `toSizeAll` in the

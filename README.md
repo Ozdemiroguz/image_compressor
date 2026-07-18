@@ -136,6 +136,12 @@ final results = await ImageCompressor.toSizeAll(
   onProgress: (done, total) => setState(() => _p = done / total),
   cancelToken: token,               // token.cancel() stops launching new work
 );
+
+// One result per input — a single bad image can't sink the batch.
+final images = results.whereType<BatchSuccess>().map((r) => r.image).toList();
+for (final failure in results.whereType<BatchFailure>()) {
+  debugPrint('skipped ${failure.source}: ${failure.error.message}');
+}
 ```
 
 ## 🖼️ Formats
