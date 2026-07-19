@@ -4,6 +4,7 @@
 //
 // Run: flutter test integration_test/edge_cases_test.dart -d <device>
 
+import 'dart:io' show Platform;
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -28,6 +29,102 @@ img.Image _detailed(int w, int h) {
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('toPreset.web lands under the preset ceiling + width',
+      (tester) async {
+    final src = _jpg(_detailed(4000, 3000));
+    final result = await ImageCompressor.toPreset(
+      ImageSource.bytes(src),
+      SizePreset.web,
+    );
+    expect(result.compressedBytes, lessThanOrEqualTo(SizePreset.web.maxBytes));
+    expect(result.width, lessThanOrEqualTo(SizePreset.web.maxWidth));
+    expect(img.decodeJpg(result.bytes), isNotNull);
+  });
+
+  testWidgets('keepMetadata preserves multiple tags + resets orientation',
+      (tester) async {
+    final image = _detailed(800, 600);
+    image.exif.imageIfd['Make'] = 'ICCam';
+    image.exif.imageIfd['Model'] = 'X1';
+    image.exif.imageIfd['Software'] = 'test-suite';
+    image.exif.imageIfd['Orientation'] = 6; // must NOT survive (baked into pixels)
+    final src = Uint8List.fromList(img.encodeJpg(image, quality: 95));
+
+    final kept = await ImageCompressor.toQuality(
+      ImageSource.bytes(src),
+      quality: 80,
+      keepMetadata: true,
+    );
+    final exif = img.decodeJpg(kept.bytes)!.exif.imageIfd;
+    // ignore: avoid_print
+    print('META kept -> Make=${exif['Make']} Software=${exif['Software']} '
+        'Orientation=${exif['Orientation']}');
+    expect('${exif['Make']}', 'ICCam');
+    expect('${exif['Software']}', 'test-suite');
+    // Orientation reset to upright (1) or absent — never the source's 6.
+    expect(exif['Orientation'], anyOf(isNull, equals(1)));
+  });
+
+  testWidgets('batch of real photos + keepMetadata, all succeed on device',
+      (tester) async {
+    final inputs = List.generate(
+        4, (i) => ImageSource.bytes(_jpg(_detailed(600 + i * 100, 400))));
+    var progress = 0;
+    final results = await ImageCompressor.toSizeAll(
+      inputs,
+      maxBytes: 100.kb,
+      keepMetadata: true,
+      onProgress: (done, total) => progress = done,
+    );
+    expect(results.whereType<BatchSuccess>().length, 4);
+    expect(progress, 4);
+    for (final r in results.whereType<BatchSuccess>()) {
+      expect(r.image.compressedBytes, lessThanOrEqualTo(100 * 1024 + 8 * 1024));
+    }
+  });
+
+  testWidgets('reachedTarget is false when the ceiling is impossible',
+      (tester) async {
+    final src = _jpg(_detailed(2000, 1500));
+    // 1 KB for a 2000x1500 photo at min quality — unreachable.
+    final result = await ImageCompressor.toSize(
+      ImageSource.bytes(src),
+      maxBytes: 1024,
+    );
+    expect(result.reachedTarget, isFalse);
+    expect(result.compressedBytes, greaterThan(0)); // still a usable result
+    expect(img.decodeJpg(result.bytes), isNotNull);
+  });
+
+  testWidgets('probe reads a PNG source', (tester) async {
+    final png = Uint8List.fromList(img.encodePng(_detailed(640, 480)));
+    final info = await ImageCompressor.probe(ImageSource.bytes(png));
+    expect(info.width, 640);
+    expect(info.height, 480);
+    expect(info.format, ImageFormat.png);
+  });
+
+  testWidgets('platform format matrix: webp=Android, heic=iOS, other throws',
+      (tester) async {
+    final src = _jpg(_detailed(400, 300));
+    Future<CompressedImage> compress(ImageFormat f) => ImageCompressor.toQuality(
+        ImageSource.bytes(src), quality: 80, format: f);
+
+    if (Platform.isAndroid) {
+      final webp = await compress(ImageFormat.webp);
+      expect(webp.format, ImageFormat.webp);
+      expect(webp.compressedBytes, greaterThan(0));
+      expect(() => compress(ImageFormat.heic),
+          throwsA(isA<UnsupportedFormatError>()));
+    } else if (Platform.isIOS) {
+      final heic = await compress(ImageFormat.heic);
+      expect(heic.format, ImageFormat.heic);
+      expect(heic.compressedBytes, greaterThan(0));
+      expect(() => compress(ImageFormat.webp),
+          throwsA(isA<UnsupportedFormatError>()));
+    }
+  });
 
   testWidgets('batch isolates a bad image (0.2.0 BatchResult, on real native)',
       (tester) async {
