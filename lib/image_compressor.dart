@@ -77,6 +77,7 @@ class ImageCompressor {
     SizePreset preset, {
     ImageFormat format = ImageFormat.jpeg,
     bool autoOrient = true,
+    bool keepMetadata = false,
     CancelToken? cancelToken,
   }) {
     return toSize(
@@ -85,6 +86,7 @@ class ImageCompressor {
       maxWidth: preset.maxWidth,
       format: format,
       autoOrient: autoOrient,
+      keepMetadata: keepMetadata,
       cancelToken: cancelToken,
     );
   }

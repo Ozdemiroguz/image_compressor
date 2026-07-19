@@ -203,6 +203,16 @@ void main() {
       );
       expect(fake.lastSizeRequest!.keepMetadata, isTrue);
     });
+
+    test('toPreset forwards keepMetadata too', () async {
+      await ImageCompressor.toPreset(
+        ImageSource.bytes(_input()),
+        SizePreset.avatar,
+        keepMetadata: true,
+      );
+      expect(fake.lastSizeRequest!.keepMetadata, isTrue);
+      expect(fake.lastSizeRequest!.maxBytes, SizePreset.avatar.maxBytes);
+    });
   });
 
   group('toPreset', () {
