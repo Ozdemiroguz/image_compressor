@@ -1,3 +1,12 @@
+## 0.2.2
+
+* **New: `ImageCompressor.probe(input)`** — read an image's dimensions, byte
+  size and format *without* decoding the pixels. Cheap enough to run on every
+  picked file before deciding whether to compress. Dimensions are EXIF-oriented,
+  consistent across Android/iOS/web and with the compressed output.
+* Added a Troubleshooting section to the README.
+* More tests (probe, header format-sniffing).
+
 ## 0.2.1
 
 Docs only.

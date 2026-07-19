@@ -32,8 +32,37 @@ public class ImageCompressorPlugin: NSObject, FlutterPlugin {
           maxBytes: args["maxBytes"] as? Int ?? Int.max,
           minQuality: args["minQuality"] as? Int ?? 10)
       }
+    case "probe":
+      probe(call, result)
     default:
       result(FlutterMethodNotImplemented)
+    }
+  }
+
+  /// Read dimensions from image properties only — no pixel decode.
+  private func probe(_ call: FlutterMethodCall, _ result: @escaping FlutterResult) {
+    guard let args = call.arguments as? [String: Any],
+          let typed = args["bytes"] as? FlutterStandardTypedData else {
+      result(FlutterError(code: "decode_error", message: "No bytes provided.", details: nil))
+      return
+    }
+    let data = typed.data
+    DispatchQueue.global(qos: .userInitiated).async {
+      guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+            let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+            let w = props[kCGImagePropertyPixelWidth] as? Int,
+            let h = props[kCGImagePropertyPixelHeight] as? Int, w > 0, h > 0 else {
+        DispatchQueue.main.async {
+          result(FlutterError(code: "decode_error", message: "Not a decodable image.", details: nil))
+        }
+        return
+      }
+      // EXIF orientation can swap the displayed dimensions.
+      let orientation = (props[kCGImagePropertyOrientation] as? Int) ?? 1
+      let swaps = orientation >= 5 && orientation <= 8
+      DispatchQueue.main.async {
+        result(["width": swaps ? h : w, "height": swaps ? w : h])
+      }
     }
   }
 

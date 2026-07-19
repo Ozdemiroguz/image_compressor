@@ -51,6 +51,21 @@ void main() {
         '${results.whereType<BatchFailure>().length} failed — batch survived');
   });
 
+  testWidgets('probe reads real dimensions + format without decoding',
+      (tester) async {
+    final src = _jpg(_detailed(1600, 1200));
+
+    final info = await ImageCompressor.probe(ImageSource.bytes(src));
+
+    // ignore: avoid_print
+    print('PROBE ${info.width}x${info.height}, ${info.byteLength} bytes, '
+        '${info.format}');
+    expect(info.width, 1600);
+    expect(info.height, 1200);
+    expect(info.format, ImageFormat.jpeg);
+    expect(info.byteLength, src.length);
+  });
+
   testWidgets('large ~27MP image compresses without OOM (the differentiator)',
       (tester) async {
     // 6000x4500 = 27 MP. A naive "decode full bitmap" approach spikes ~108 MB

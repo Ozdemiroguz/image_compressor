@@ -3,6 +3,7 @@ import 'dart:async';
 import 'image_compressor_platform_interface.dart';
 import 'src/cancel_token.dart';
 import 'src/encode_request.dart';
+import 'src/format_sniff.dart';
 import 'src/models.dart';
 import 'src/source_loader.dart';
 
@@ -13,6 +14,7 @@ export 'src/models.dart'
         ImageFormat,
         ImageSource,
         CompressedImage,
+        ImageProbe,
         BatchResult,
         BatchSuccess,
         BatchFailure,
@@ -32,6 +34,31 @@ export 'src/save.dart' show CompressedImageSave;
 /// (hard failures throw a [CompressError]).
 class ImageCompressor {
   ImageCompressor._();
+
+  /// Read an image's dimensions, byte size and format WITHOUT decoding its
+  /// pixels — cheap enough to run on every picked file before deciding whether
+  /// (or how) to compress it.
+  ///
+  /// ```dart
+  /// final info = await ImageCompressor.probe(ImageSource.xfile(picked));
+  /// if (info.byteLength > 1.mb || info.width > 4000) {
+  ///   await ImageCompressor.toSize(ImageSource.xfile(picked), maxBytes: 500.kb);
+  /// }
+  /// ```
+  ///
+  /// Throws [SourceNotFoundError] if the source can't be read, or [DecodeError]
+  /// if the bytes aren't a readable image.
+  static Future<ImageProbe> probe(ImageSource input) async {
+    final bytes = await resolveSource(input);
+    final (width, height) =
+        await ImageCompressorPlatform.instance.probeSize(bytes);
+    return ImageProbe(
+      width: width,
+      height: height,
+      byteLength: bytes.length,
+      format: sniffFormat(bytes),
+    );
+  }
 
   /// Compress [input] until it fits under [maxBytes].
   ///

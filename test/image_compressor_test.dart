@@ -57,6 +57,15 @@ class FakePlatform
     lastSizeRequest = request;
     return sizeResult;
   }
+
+  (int, int) probeResult = (1920, 1080);
+  Uint8List? lastProbedBytes;
+
+  @override
+  Future<(int, int)> probeSize(Uint8List bytes) async {
+    lastProbedBytes = bytes;
+    return probeResult;
+  }
 }
 
 Uint8List _input([int len = 50000]) => Uint8List(len);
@@ -179,6 +188,50 @@ void main() {
       expect(seen.length, 5);
       expect(seen.last, 5);
       expect(seen, List.generate(5, (i) => i + 1));
+    });
+  });
+
+  group('probe', () {
+    test('returns native dims + sniffed format + byte length', () async {
+      fake.probeResult = (4000, 3000);
+      // JPEG magic bytes (FF D8 FF) + padding.
+      final jpeg = Uint8List.fromList(
+          [0xFF, 0xD8, 0xFF, ...List.filled(97, 0)]);
+
+      final info = await ImageCompressor.probe(ImageSource.bytes(jpeg));
+
+      expect(info.width, 4000);
+      expect(info.height, 3000);
+      expect(info.byteLength, 100);
+      expect(info.format, ImageFormat.jpeg);
+      expect(info.pixelCount, 12000000);
+      expect(fake.lastProbedBytes, jpeg);
+    });
+
+    test('format is null for an unrecognized header', () async {
+      final unknown = Uint8List.fromList(List.filled(64, 0x42));
+      final info = await ImageCompressor.probe(ImageSource.bytes(unknown));
+      expect(info.format, isNull);
+    });
+
+    test('sniffs png / webp / heic from their headers', () async {
+      Future<ImageFormat?> fmt(List<int> header) async {
+        final b = Uint8List.fromList([...header, ...List.filled(64, 0)]);
+        return (await ImageCompressor.probe(ImageSource.bytes(b))).format;
+      }
+
+      expect(await fmt([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]),
+          ImageFormat.png);
+      // "RIFF" + 4 size bytes + "WEBP"
+      expect(
+        await fmt([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50]),
+        ImageFormat.webp,
+      );
+      // 4 size bytes + "ftyp" + "heic"
+      expect(
+        await fmt([0, 0, 0, 0, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63]),
+        ImageFormat.heic,
+      );
     });
   });
 

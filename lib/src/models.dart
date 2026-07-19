@@ -108,6 +108,39 @@ class CompressedImage {
       'bytes, q=$usedQuality, format=$format, reachedTarget=$reachedTarget)';
 }
 
+/// Lightweight facts about an image, read WITHOUT fully decoding its pixels —
+/// what `ImageCompressor.probe` returns. Useful for "how big is this before I
+/// process it" checks (dimensions, byte size, format) on the cheap.
+@immutable
+class ImageProbe {
+  const ImageProbe({
+    required this.width,
+    required this.height,
+    required this.byteLength,
+    required this.format,
+  });
+
+  /// Pixel width of the source image.
+  final int width;
+
+  /// Pixel height of the source image.
+  final int height;
+
+  /// Byte length of the source data.
+  final int byteLength;
+
+  /// The detected format, sniffed from the file header — or `null` if it isn't
+  /// one this package recognizes (e.g. GIF, BMP).
+  final ImageFormat? format;
+
+  /// Total pixels (`width * height`).
+  int get pixelCount => width * height;
+
+  @override
+  String toString() =>
+      'ImageProbe(${width}x$height, $byteLength bytes, format=$format)';
+}
+
 /// The outcome of one image in a batch (`toSizeAll` / `toQualityAll`).
 ///
 /// A batch never fails as a whole because one image is bad — each input gets its

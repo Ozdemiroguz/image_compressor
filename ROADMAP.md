@@ -14,6 +14,8 @@ The package won't go silent for months, and issues get a first response quickly.
 
 ## Shipped
 
+- **0.2.2** — `probe()`: read dimensions / size / format without decoding.
+  Troubleshooting docs.
 - **0.2.0** — Batch is no longer all-or-nothing: `toSizeAll` / `toQualityAll`
   return `List<BatchResult>` (success or failure per input), so one bad image
   can't discard the rest. Simpler example, inline API examples.

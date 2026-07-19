@@ -20,6 +20,24 @@ class MethodChannelImageCompressor extends ImageCompressorPlatform {
     return _invoke('encodeToSize', request.toMap(), request.format);
   }
 
+  @override
+  Future<(int, int)> probeSize(Uint8List bytes) async {
+    try {
+      final map = await methodChannel.invokeMethod<Map<Object?, Object?>>(
+        'probe',
+        {'bytes': bytes},
+      );
+      final w = map?['width'];
+      final h = map?['height'];
+      if (w is! num || h is! num) {
+        throw DecodeError('Native probe returned no dimensions.');
+      }
+      return (w.toInt(), h.toInt());
+    } on PlatformException catch (e) {
+      throw DecodeError(e.message ?? e.code);
+    }
+  }
+
   Future<EncodeResult> _invoke(
     String method,
     Map<String, Object?> args,

@@ -137,6 +137,20 @@ final image = await ImageCompressor.toQuality(
 );
 ```
 
+## 🔎 Probe before you compress
+
+Read an image's size, dimensions and format **without decoding it** — cheap
+enough to run on every picked file:
+
+```dart
+final info = await ImageCompressor.probe(ImageSource.xfile(picked));
+// info.width, info.height, info.byteLength, info.format (ImageFormat?)
+
+if (info.byteLength > 1.mb || info.width > 4000) {
+  // only bother compressing the big ones
+}
+```
+
 ## 🗂️ Any input source
 
 ```dart
@@ -248,6 +262,29 @@ comes back as a `BatchFailure` and the rest still succeed.
 **Is it slower than the native alternatives?**
 No — it's a dead heat (103 ms vs 102 ms on a 6.75 MP photo), and that includes
 the EXIF orientation pass most alternatives skip. See [BENCHMARK.md](BENCHMARK.md).
+
+## 🛠️ Troubleshooting
+
+**"It returns `null`."**
+It doesn't — that's the old quality-only packages. Failures throw a typed
+`CompressError`; a `toSize` that can't reach the ceiling returns a real result
+with `reachedTarget: false`.
+
+**`UnsupportedFormatError` on iOS with WebP (or Android with HEIC).**
+Encoder support is per-platform (see the table above). WebP has no iOS encoder;
+HEIC has no Android one. Use JPEG/PNG for cross-platform output.
+
+**Web: `DecodeError` or nothing happens.**
+Web needs `OffscreenCanvas.convertToBlob` — Safari 16.4+ or any evergreen engine.
+Older WebViews aren't supported.
+
+**Picked image comes out sideways.**
+It shouldn't — `autoOrient` is `true` by default and bakes EXIF rotation into the
+pixels. If you set `autoOrient: false`, you own the orientation.
+
+**A big batch is slow / spikes memory.**
+Lower `concurrency` on `toSizeAll` / `toQualityAll` (it bounds how many decode at
+once). The default is 3.
 
 ## 💛 Support
 

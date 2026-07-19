@@ -56,7 +56,42 @@ class ImageCompressorPlugin :
                     minQuality = args["minQuality"] as? Int ?: 10,
                 )
             }
+            "probe" -> probe(call, result)
             else -> result.notImplemented()
+        }
+    }
+
+    /** Read dimensions from the header only (inJustDecodeBounds), no pixels. */
+    private fun probe(call: MethodCall, result: Result) {
+        @Suppress("UNCHECKED_CAST")
+        val args = call.arguments as? Map<String, Any?>
+        val bytes = args?.get("bytes") as? ByteArray
+        if (bytes == null) {
+            result.error("decode_error", "No bytes provided.", null)
+            return
+        }
+        executor.execute {
+            val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+            if (opts.outWidth <= 0 || opts.outHeight <= 0) {
+                main.post { result.error("decode_error", "Not a decodable image.", null) }
+                return@execute
+            }
+            // Report the UPRIGHT (EXIF-oriented) dimensions, matching iOS/web and
+            // the dimensions a compressed output would have.
+            val orientation = try {
+                ExifInterface(ByteArrayInputStream(bytes))
+                    .getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+            } catch (_: Throwable) {
+                ExifInterface.ORIENTATION_NORMAL
+            }
+            val swaps = orientation == ExifInterface.ORIENTATION_ROTATE_90 ||
+                orientation == ExifInterface.ORIENTATION_ROTATE_270 ||
+                orientation == ExifInterface.ORIENTATION_TRANSPOSE ||
+                orientation == ExifInterface.ORIENTATION_TRANSVERSE
+            val w = if (swaps) opts.outHeight else opts.outWidth
+            val h = if (swaps) opts.outWidth else opts.outHeight
+            main.post { result.success(mapOf("width" to w, "height" to h)) }
         }
     }
 

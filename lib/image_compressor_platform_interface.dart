@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'image_compressor_method_channel.dart';
@@ -36,5 +38,11 @@ abstract class ImageCompressorPlatform extends PlatformInterface {
   /// or (if nothing fits) the smallest achievable with `reachedTarget` false.
   Future<EncodeResult> encodeToSize(EncodeSizeRequest request) {
     throw UnimplementedError('encodeToSize() has not been implemented.');
+  }
+
+  /// Read just the pixel dimensions of [bytes] from the image header, without
+  /// decoding the pixels. Returns `(width, height)`.
+  Future<(int width, int height)> probeSize(Uint8List bytes) {
+    throw UnimplementedError('probeSize() has not been implemented.');
   }
 }

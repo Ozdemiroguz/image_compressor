@@ -20,6 +20,29 @@ class ImageCompressorWeb extends ImageCompressorPlatform {
   }
 
   @override
+  Future<(int, int)> probeSize(Uint8List bytes) async {
+    final blob = web.Blob(
+      [bytes.toJS].toJS,
+      web.BlobPropertyBag(type: 'application/octet-stream'),
+    );
+    final web.ImageBitmap bitmap;
+    try {
+      // Oriented dimensions, to match iOS/Android and the compressed output.
+      bitmap = await web.window
+          .createImageBitmap(
+            blob,
+            web.ImageBitmapOptions(imageOrientation: 'from-image'),
+          )
+          .toDart;
+    } catch (e) {
+      throw DecodeError('Could not read image: $e');
+    }
+    final size = (bitmap.width, bitmap.height);
+    bitmap.close();
+    return size;
+  }
+
+  @override
   Future<EncodeResult> encodeOnce(EncodeRequest request) async {
     final mime = _mime(request.format);
     if (mime == null) throw UnsupportedFormatError(request.format);
