@@ -28,6 +28,7 @@ class ImageCompressorPlugin :
     FlutterPlugin,
     MethodCallHandler {
     private lateinit var channel: MethodChannel
+    private var cacheDir: java.io.File? = null
 
     private val executor = Executors.newCachedThreadPool()
     private val main = Handler(Looper.getMainLooper())
@@ -35,26 +36,32 @@ class ImageCompressorPlugin :
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(binding.binaryMessenger, "image_compressor")
         channel.setMethodCallHandler(this)
+        cacheDir = binding.applicationContext.cacheDir
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
         when (call.method) {
             "encodeOnce" -> run(call, result) { bitmap, args ->
                 val quality = args["quality"] as? Int ?: 80
-                val format = compressFormatFor(args["format"] as? String ?: "jpeg")
-                    ?: throw UnsupportedFormat()
-                val bytes = encode(bitmap, format, quality)
+                val formatName = args["format"] as? String ?: "jpeg"
+                val format = compressFormatFor(formatName) ?: throw UnsupportedFormat()
+                var bytes = encode(bitmap, format, quality)
+                bytes = maybeCopyExif(bytes, args, formatName)
                 resultMap(bytes, bitmap, quality, true)
             }
             "encodeToSize" -> run(call, result) { bitmap, args ->
-                val format = compressFormatFor(args["format"] as? String ?: "jpeg")
-                    ?: throw UnsupportedFormat()
-                searchToSize(
+                val formatName = args["format"] as? String ?: "jpeg"
+                val format = compressFormatFor(formatName) ?: throw UnsupportedFormat()
+                val out = searchToSize(
                     bitmap,
                     format,
                     maxBytes = args["maxBytes"] as? Int ?: Int.MAX_VALUE,
                     minQuality = args["minQuality"] as? Int ?: 10,
                 )
+                // Metadata is copied onto the final result only (may add a few KB
+                // over maxBytes — EXIF is small; JPEG only).
+                val bytes = maybeCopyExif(out["bytes"] as ByteArray, args, formatName)
+                out.toMutableMap().apply { this["bytes"] = bytes }
             }
             "probe" -> probe(call, result)
             else -> result.notImplemented()
@@ -169,6 +176,51 @@ class ImageCompressorPlugin :
     }
 
     // ---- encode (cheap, reuses the decoded bitmap) --------------------------
+
+    /** EXIF tags worth preserving. NOT orientation (reset — pixels are baked). */
+    private val exifTags = listOf(
+        ExifInterface.TAG_DATETIME, ExifInterface.TAG_DATETIME_ORIGINAL,
+        ExifInterface.TAG_DATETIME_DIGITIZED, ExifInterface.TAG_MAKE,
+        ExifInterface.TAG_MODEL, ExifInterface.TAG_SOFTWARE, ExifInterface.TAG_ARTIST,
+        ExifInterface.TAG_COPYRIGHT, ExifInterface.TAG_IMAGE_DESCRIPTION,
+        ExifInterface.TAG_GPS_LATITUDE, ExifInterface.TAG_GPS_LATITUDE_REF,
+        ExifInterface.TAG_GPS_LONGITUDE, ExifInterface.TAG_GPS_LONGITUDE_REF,
+        ExifInterface.TAG_GPS_ALTITUDE, ExifInterface.TAG_GPS_ALTITUDE_REF,
+        ExifInterface.TAG_GPS_TIMESTAMP, ExifInterface.TAG_GPS_DATESTAMP,
+        ExifInterface.TAG_EXPOSURE_TIME, ExifInterface.TAG_F_NUMBER,
+        ExifInterface.TAG_ISO_SPEED, ExifInterface.TAG_FOCAL_LENGTH,
+        ExifInterface.TAG_WHITE_BALANCE, ExifInterface.TAG_FLASH,
+        ExifInterface.TAG_LENS_MAKE, ExifInterface.TAG_LENS_MODEL,
+    )
+
+    /**
+     * Copies the source's EXIF tags onto [out] when keepMetadata is on (JPEG
+     * only — ExifInterface can't write PNG/WebP reliably). Orientation is reset
+     * to normal since rotation is baked into the pixels. Best-effort: any failure
+     * returns the un-tagged bytes rather than throwing.
+     */
+    private fun maybeCopyExif(out: ByteArray, args: Map<String, Any?>, formatName: String): ByteArray {
+        if (args["keepMetadata"] as? Boolean != true || formatName != "jpeg") return out
+        val src = args["bytes"] as? ByteArray ?: return out
+        val dir = cacheDir ?: return out
+        val tmp = java.io.File.createTempFile("ic_exif", ".jpg", dir)
+        return try {
+            tmp.writeBytes(out)
+            val srcExif = ExifInterface(ByteArrayInputStream(src))
+            val dstExif = ExifInterface(tmp.absolutePath)
+            for (tag in exifTags) srcExif.getAttribute(tag)?.let { dstExif.setAttribute(tag, it) }
+            dstExif.setAttribute(
+                ExifInterface.TAG_ORIENTATION,
+                ExifInterface.ORIENTATION_NORMAL.toString(),
+            )
+            dstExif.saveAttributes()
+            tmp.readBytes()
+        } catch (_: Throwable) {
+            out
+        } finally {
+            tmp.delete()
+        }
+    }
 
     private fun encode(bitmap: Bitmap, format: Bitmap.CompressFormat, quality: Int): ByteArray {
         val stream = ByteArrayOutputStream()

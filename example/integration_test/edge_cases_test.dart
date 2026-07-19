@@ -51,6 +51,35 @@ void main() {
         '${results.whereType<BatchFailure>().length} failed — batch survived');
   });
 
+  testWidgets('keepMetadata copies EXIF onto the output (real native)',
+      (tester) async {
+    final image = _detailed(800, 600);
+    image.exif.imageIfd['Make'] = 'ImageCompressorCam';
+    image.exif.imageIfd['Model'] = 'Test100';
+    final src = Uint8List.fromList(img.encodeJpg(image, quality: 95));
+
+    // Control: stripped by default.
+    final stripped = await ImageCompressor.toQuality(
+      ImageSource.bytes(src),
+      quality: 80,
+      keepMetadata: false,
+    );
+    expect(img.decodeJpg(stripped.bytes)!.exif.imageIfd['Make'], isNull,
+        reason: 'metadata is stripped by default');
+
+    // Treatment: preserved.
+    final kept = await ImageCompressor.toQuality(
+      ImageSource.bytes(src),
+      quality: 80,
+      keepMetadata: true,
+    );
+    final exif = img.decodeJpg(kept.bytes)!.exif;
+    // ignore: avoid_print
+    print('EXIF kept -> Make=${exif.imageIfd['Make']} Model=${exif.imageIfd['Model']}');
+    expect('${exif.imageIfd['Make']}', 'ImageCompressorCam');
+    expect('${exif.imageIfd['Model']}', 'Test100');
+  });
+
   testWidgets('probe reads real dimensions + format without decoding',
       (tester) async {
     final src = _jpg(_detailed(1600, 1200));

@@ -16,6 +16,7 @@ class EncodeRequest {
     required this.autoOrient,
     this.maxWidth,
     this.maxHeight,
+    this.keepMetadata = false,
   });
 
   /// Raw source image bytes (already resolved from the [ImageSource]).
@@ -35,6 +36,10 @@ class EncodeRequest {
   final int? maxWidth;
   final int? maxHeight;
 
+  /// Copy the source EXIF/GPS/TIFF metadata onto the output (native only; the
+  /// orientation tag is reset since rotation is baked into the pixels).
+  final bool keepMetadata;
+
   /// Serialized form sent across the method channel.
   Map<String, Object?> toMap() => {
     'bytes': bytes,
@@ -43,6 +48,7 @@ class EncodeRequest {
     'autoOrient': autoOrient,
     'maxWidth': maxWidth,
     'maxHeight': maxHeight,
+    'keepMetadata': keepMetadata,
   };
 }
 
@@ -63,6 +69,7 @@ class EncodeSizeRequest {
     required this.autoOrient,
     this.maxWidth,
     this.maxHeight,
+    this.keepMetadata = false,
   });
 
   final Uint8List bytes;
@@ -72,6 +79,7 @@ class EncodeSizeRequest {
   final bool autoOrient;
   final int? maxWidth;
   final int? maxHeight;
+  final bool keepMetadata;
 
   Map<String, Object?> toMap() => {
     'bytes': bytes,
@@ -81,6 +89,7 @@ class EncodeSizeRequest {
     'autoOrient': autoOrient,
     'maxWidth': maxWidth,
     'maxHeight': maxHeight,
+    'keepMetadata': keepMetadata,
   };
 }
 

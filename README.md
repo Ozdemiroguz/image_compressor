@@ -279,12 +279,19 @@ No. `toSizeAll` / `toQualityAll` return one `BatchResult` per input; the bad one
 comes back as a `BatchFailure` and the rest still succeed.
 
 **Does it keep EXIF metadata (GPS, camera, date)?**
-No — re-encoding strips it, which is usually what you want: EXIF carries location
-and timestamps you rarely want to hand to a backend. Orientation is the exception,
-and it's handled by baking the rotation into the pixels (`autoOrient`), so photos
-still come out upright without a tag to leak. If you have a real need to preserve
-the rest of the metadata, [open an issue](https://github.com/Ozdemiroguz/image_compressor/issues)
-— it's doable on Android/iOS (not web) and will land when there's a use case for it.
+By default no — it's stripped, which is usually what you want (EXIF carries
+location and timestamps you rarely want to hand to a backend). Pass
+`keepMetadata: true` to preserve it:
+
+```dart
+await ImageCompressor.toSize(input, maxBytes: 500.kb, keepMetadata: true);
+```
+
+Works on **Android and iOS** (JPEG). The orientation tag is always reset — since
+rotation is baked into the pixels, keeping it would double-rotate. **Web can't
+preserve metadata** (the canvas encoder strips it), so `keepMetadata` has no
+effect there. On Android the copied metadata can push the output a few KB over
+`maxBytes` (EXIF is small).
 
 **Is it slower than the native alternatives?**
 No — it's a dead heat (103 ms vs 102 ms on a 6.75 MP photo), and that includes

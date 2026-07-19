@@ -21,7 +21,8 @@ public class ImageCompressorPlugin: NSObject, FlutterPlugin {
       run(call, result) { image, args in
         let quality = args["quality"] as? Int ?? 80
         let typeId = try self.requireType(args["format"] as? String ?? "jpeg")
-        let bytes = try self.encode(image, typeId: typeId, quality: quality)
+        let bytes = try self.encode(
+          image, typeId: typeId, quality: quality, metadata: self.metadata(args))
         return self.resultMap(bytes, image, quality, true)
       }
     case "encodeToSize":
@@ -30,7 +31,8 @@ public class ImageCompressorPlugin: NSObject, FlutterPlugin {
         return try self.searchToSize(
           image, typeId: typeId,
           maxBytes: args["maxBytes"] as? Int ?? Int.max,
-          minQuality: args["minQuality"] as? Int ?? 10)
+          minQuality: args["minQuality"] as? Int ?? 10,
+          metadata: self.metadata(args))
       }
     case "probe":
       probe(call, result)
@@ -142,14 +144,21 @@ public class ImageCompressorPlugin: NSObject, FlutterPlugin {
 
   // ---- encode (cheap, reuses the decoded image) ----------------------------
 
-  private func encode(_ image: CGImage, typeId: CFString, quality: Int) throws -> Data {
+  private func encode(
+    _ image: CGImage, typeId: CFString, quality: Int, metadata: [CFString: Any]? = nil
+  ) throws -> Data {
     let out = NSMutableData()
     guard let dest = CGImageDestinationCreateWithData(out, typeId, 1, nil) else {
       throw CompressFailure(code: "unsupported_format", message: "Cannot encode this format on iOS.")
     }
-    let props: [CFString: Any] = [
+    var props: [CFString: Any] = [
       kCGImageDestinationLossyCompressionQuality: Double(min(max(quality, 0), 100)) / 100.0,
     ]
+    if let metadata = metadata {
+      props.merge(metadata) { _, new in new }
+      // Rotation is baked into the pixels, so the output must read as upright.
+      props[kCGImagePropertyOrientation] = 1
+    }
     CGImageDestinationAddImage(dest, image, props as CFDictionary)
     guard CGImageDestinationFinalize(dest) else {
       throw CompressFailure(code: "decode_error", message: "Failed to encode image.")
@@ -157,12 +166,33 @@ public class ImageCompressorPlugin: NSObject, FlutterPlugin {
     return out as Data
   }
 
+  /// Metadata to copy, or nil when keepMetadata is off.
+  private func metadata(_ args: [String: Any]) -> [CFString: Any]? {
+    guard args["keepMetadata"] as? Bool ?? false,
+          let typed = args["bytes"] as? FlutterStandardTypedData else { return nil }
+    return sourceMetadata(typed.data)
+  }
+
+  /// Source EXIF/GPS/TIFF metadata for copying onto the output — minus the tags
+  /// that describe the source pixels (orientation and dimensions), which no
+  /// longer apply after decode + resize.
+  private func sourceMetadata(_ data: Data) -> [CFString: Any]? {
+    guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+          var props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+    else { return nil }
+    props.removeValue(forKey: kCGImagePropertyOrientation)
+    props.removeValue(forKey: kCGImagePropertyPixelWidth)
+    props.removeValue(forKey: kCGImagePropertyPixelHeight)
+    return props
+  }
+
   private func searchToSize(
-    _ image: CGImage, typeId: CFString, maxBytes: Int, minQuality: Int
+    _ image: CGImage, typeId: CFString, maxBytes: Int, minQuality: Int,
+    metadata: [CFString: Any]?
   ) throws -> [String: Any] {
     // PNG is lossless; quality does nothing — encode once.
     if typeId == ("public.png" as CFString) {
-      let bytes = try encode(image, typeId: typeId, quality: 100)
+      let bytes = try encode(image, typeId: typeId, quality: 100, metadata: metadata)
       return resultMap(bytes, image, 100, bytes.count <= maxBytes)
     }
 
@@ -175,7 +205,7 @@ public class ImageCompressorPlugin: NSObject, FlutterPlugin {
 
     while lo <= hi {
       let mid = (lo + hi) / 2
-      let bytes = try encode(image, typeId: typeId, quality: mid)
+      let bytes = try encode(image, typeId: typeId, quality: mid, metadata: metadata)
       if smallest == nil || bytes.count < smallest!.count {
         smallest = bytes
         smallestQuality = mid

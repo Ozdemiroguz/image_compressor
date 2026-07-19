@@ -1,11 +1,17 @@
-## 0.2.2
+## 0.3.0
 
-* **New: `ImageCompressor.probe(input)`** — read an image's dimensions, byte
-  size and format *without* decoding the pixels. Cheap enough to run on every
-  picked file before deciding whether to compress. Dimensions are EXIF-oriented,
-  consistent across Android/iOS/web and with the compressed output.
-* Added a Troubleshooting section to the README.
-* More tests (probe, header format-sniffing).
+Three additions, all verified on-device (iOS + Android):
+
+* **`ImageCompressor.probe(input)`** — read dimensions / byte size / format
+  *without* decoding pixels. EXIF-oriented dims, consistent across platforms.
+* **`SizePreset` + `toPreset`** — named target sizes (`thumbnail` / `avatar` /
+  `web` / `hd`) for the common cases. Size-first, not quality presets.
+* **`keepMetadata:`** on `toSize` / `toQuality` (+ the batch variants) — preserve
+  the source EXIF/GPS/camera metadata (Android + iOS, JPEG). Default `false`
+  (stripping is the privacy-safe default). The orientation tag is always reset
+  (rotation is baked into pixels). Web can't preserve metadata and ignores the
+  flag; on Android the copied tags may push the output a few KB over `maxBytes`.
+* Troubleshooting section in the README.
 
 ## 0.2.1
 

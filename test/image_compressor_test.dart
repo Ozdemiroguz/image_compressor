@@ -191,6 +191,20 @@ void main() {
     });
   });
 
+  group('keepMetadata', () {
+    test('defaults to false and forwards true to the native request', () async {
+      await ImageCompressor.toQuality(ImageSource.bytes(_input()), quality: 80);
+      expect(fake.onceRequests.last.keepMetadata, isFalse);
+
+      await ImageCompressor.toSize(
+        ImageSource.bytes(_input()),
+        maxBytes: 500.kb,
+        keepMetadata: true,
+      );
+      expect(fake.lastSizeRequest!.keepMetadata, isTrue);
+    });
+  });
+
   group('toPreset', () {
     test('web preset forwards its maxBytes + maxWidth to the size request',
         () async {

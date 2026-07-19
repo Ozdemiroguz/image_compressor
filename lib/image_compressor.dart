@@ -119,6 +119,7 @@ class ImageCompressor {
     int? maxHeight,
     bool autoOrient = true,
     int minQuality = 10,
+    bool keepMetadata = false,
     CancelToken? cancelToken,
   }) async {
     if (maxBytes <= 0) {
@@ -140,6 +141,7 @@ class ImageCompressor {
         autoOrient: autoOrient,
         maxWidth: maxWidth,
         maxHeight: maxHeight,
+        keepMetadata: keepMetadata,
       ),
     );
     return _toCompressed(
@@ -167,6 +169,7 @@ class ImageCompressor {
     int? maxWidth,
     int? maxHeight,
     bool autoOrient = true,
+    bool keepMetadata = false,
     CancelToken? cancelToken,
   }) async {
     if (quality < 0 || quality > 100) {
@@ -184,6 +187,7 @@ class ImageCompressor {
         autoOrient: autoOrient,
         maxWidth: maxWidth,
         maxHeight: maxHeight,
+        keepMetadata: keepMetadata,
       ),
     );
     return _toCompressed(
@@ -218,6 +222,7 @@ class ImageCompressor {
     int? maxHeight,
     bool autoOrient = true,
     int minQuality = 10,
+    bool keepMetadata = false,
     int concurrency = 3,
     void Function(int done, int total)? onProgress,
     CancelToken? cancelToken,
@@ -235,6 +240,7 @@ class ImageCompressor {
           maxHeight: maxHeight,
           autoOrient: autoOrient,
           minQuality: minQuality,
+          keepMetadata: keepMetadata,
           cancelToken: cancelToken,
         ),
       ),
@@ -253,6 +259,7 @@ class ImageCompressor {
     int? maxWidth,
     int? maxHeight,
     bool autoOrient = true,
+    bool keepMetadata = false,
     int concurrency = 3,
     void Function(int done, int total)? onProgress,
     CancelToken? cancelToken,
@@ -269,6 +276,7 @@ class ImageCompressor {
           maxWidth: maxWidth,
           maxHeight: maxHeight,
           autoOrient: autoOrient,
+          keepMetadata: keepMetadata,
           cancelToken: cancelToken,
         ),
       ),
