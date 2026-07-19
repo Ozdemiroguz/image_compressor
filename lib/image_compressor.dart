@@ -13,6 +13,7 @@ export 'src/models.dart'
     show
         ImageFormat,
         ImageSource,
+        SizePreset,
         CompressedImage,
         ImageProbe,
         BatchResult,
@@ -57,6 +58,34 @@ class ImageCompressor {
       height: height,
       byteLength: bytes.length,
       format: sniffFormat(bytes),
+    );
+  }
+
+  /// Compress [input] to a named [SizePreset] — a `maxBytes` + `maxWidth` pair
+  /// for a common case, so you say what the image is *for* instead of tuning
+  /// numbers.
+  ///
+  /// ```dart
+  /// // "I need a web-sized version" — under 500 KB, max 1920 px.
+  /// final image = await ImageCompressor.toPreset(
+  ///   ImageSource.xfile(picked),
+  ///   SizePreset.web,
+  /// );
+  /// ```
+  static Future<CompressedImage> toPreset(
+    ImageSource input,
+    SizePreset preset, {
+    ImageFormat format = ImageFormat.jpeg,
+    bool autoOrient = true,
+    CancelToken? cancelToken,
+  }) {
+    return toSize(
+      input,
+      maxBytes: preset.maxBytes,
+      maxWidth: preset.maxWidth,
+      format: format,
+      autoOrient: autoOrient,
+      cancelToken: cancelToken,
     );
   }
 

@@ -16,6 +16,35 @@ import 'package:flutter/foundation.dart';
 /// So jpeg/png are safe everywhere, webp is Android + web, and heic is iOS only.
 enum ImageFormat { jpeg, png, webp, heic }
 
+/// Named target sizes for the common cases, so you can say what an image is
+/// *for* instead of picking a byte ceiling and a dimension cap by hand.
+///
+/// Each preset is just a `maxBytes` + `maxWidth` pair fed to
+/// `ImageCompressor.toPreset`. Unlike quality presets (low/medium/high — a vague
+/// number by another name), these stay true to the point of the package: you
+/// name a size, it finds the quality.
+enum SizePreset {
+  /// A list/grid thumbnail — under 50 KB, max 400 px.
+  thumbnail(maxBytes: 50 * 1024, maxWidth: 400),
+
+  /// A profile avatar — under 150 KB, max 800 px.
+  avatar(maxBytes: 150 * 1024, maxWidth: 800),
+
+  /// A general web/upload image — under 500 KB, max 1920 px.
+  web(maxBytes: 500 * 1024, maxWidth: 1920),
+
+  /// A high-detail image — under 2 MB, max 4000 px.
+  hd(maxBytes: 2 * 1024 * 1024, maxWidth: 4000);
+
+  const SizePreset({required this.maxBytes, required this.maxWidth});
+
+  /// The byte ceiling this preset targets.
+  final int maxBytes;
+
+  /// The longest-edge pixel cap this preset applies.
+  final int maxWidth;
+}
+
 /// Where the bytes to compress come from.
 ///
 /// One sealed type instead of four overloaded methods: a caller passes bytes, a

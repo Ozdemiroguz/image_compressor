@@ -191,6 +191,26 @@ void main() {
     });
   });
 
+  group('toPreset', () {
+    test('web preset forwards its maxBytes + maxWidth to the size request',
+        () async {
+      await ImageCompressor.toPreset(
+        ImageSource.bytes(_input()),
+        SizePreset.web,
+      );
+      final req = fake.lastSizeRequest!;
+      expect(req.maxBytes, SizePreset.web.maxBytes); // 500 KB
+      expect(req.maxWidth, SizePreset.web.maxWidth); // 1920
+    });
+
+    test('preset values are the documented size-first pairs', () {
+      expect(SizePreset.thumbnail.maxBytes, 50 * 1024);
+      expect(SizePreset.thumbnail.maxWidth, 400);
+      expect(SizePreset.hd.maxBytes, 2 * 1024 * 1024);
+      expect(SizePreset.hd.maxWidth, 4000);
+    });
+  });
+
   group('probe', () {
     test('returns native dims + sniffed format + byte length', () async {
       fake.probeResult = (4000, 3000);

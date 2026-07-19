@@ -127,6 +127,25 @@ the format conversion can make it larger while still fitting under the ceiling.
 Compare `compressedBytes` to `originalBytes` if you want to keep the smaller of
 the two.
 
+## 📐 Size presets
+
+Say what the image is *for* instead of tuning numbers. Each preset is a byte
+ceiling + a dimension cap — still size-first, no quality to guess:
+
+```dart
+final image = await ImageCompressor.toPreset(
+  ImageSource.xfile(picked),
+  SizePreset.web,   // thumbnail · avatar · web · hd
+);
+```
+
+| Preset | Max size | Max width |
+|--------|:--------:|:---------:|
+| `thumbnail` | 50 KB  | 400 px  |
+| `avatar`    | 150 KB | 800 px  |
+| `web`       | 500 KB | 1920 px |
+| `hd`        | 2 MB   | 4000 px |
+
 ## 🎚️ Fixed quality
 
 ```dart
@@ -258,6 +277,14 @@ script tag or `index.html` setup. Needs Safari 16.4+ / any evergreen engine.
 **One image in my batch is corrupt — do I lose the rest?**
 No. `toSizeAll` / `toQualityAll` return one `BatchResult` per input; the bad one
 comes back as a `BatchFailure` and the rest still succeed.
+
+**Does it keep EXIF metadata (GPS, camera, date)?**
+No — re-encoding strips it, which is usually what you want: EXIF carries location
+and timestamps you rarely want to hand to a backend. Orientation is the exception,
+and it's handled by baking the rotation into the pixels (`autoOrient`), so photos
+still come out upright without a tag to leak. If you have a real need to preserve
+the rest of the metadata, [open an issue](https://github.com/Ozdemiroguz/image_compressor/issues)
+— it's doable on Android/iOS (not web) and will land when there's a use case for it.
 
 **Is it slower than the native alternatives?**
 No — it's a dead heat (103 ms vs 102 ms on a 6.75 MP photo), and that includes
